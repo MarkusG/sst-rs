@@ -5,6 +5,42 @@ use crate::model::Transaction;
 
 const DATABASE_STRING: &str = "sst.db";
 
+pub fn ensure_created() -> Result<(), sqlite::Error> {
+    let connection = sqlite::open(DATABASE_STRING)?;
+    let mut statement = connection
+        .prepare("SELECT * FROM sqlite_schema")?;
+    if let State::Done = statement.next()? {
+        connection.execute(r#"
+            CREATE TABLE transactions (
+                id INTEGER PRIMARY KEY,
+                timestamp INTEGER,
+                account TEXT,
+                amount REAL,
+                category TEXT,
+                description TEXT
+                checksum BLOB
+            );
+
+            CREATE TABLE tags (
+                id INTEGER PRIMARY KEY,
+                transaction_id INTEGER,
+                value TEXT,
+
+                FOREIGN KEY(transaction_id) REFERENCES transactions(id)
+            );
+
+            CREATE TABLE notes (
+                id INTEGER PRIMARY KEY,
+                transaction_id INTEGER,
+                value TEXT,
+
+                FOREIGN KEY(transaction_id) REFERENCES transactions(id)
+            );
+        "#)?;
+    }
+    Ok(())
+}
+
 pub fn upsert_transaction(transaction: &Transaction) {
     let t = transaction;
 

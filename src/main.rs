@@ -4,6 +4,7 @@ use sst::db;
 use sst::model::Transaction;
 
 fn main() {
+    db::ensure_created().unwrap();
     db::upsert_transaction(&Transaction::new(
         None,
         OffsetDateTime::now_local().unwrap(),
