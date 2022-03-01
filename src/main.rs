@@ -6,15 +6,7 @@ use sst::model::Transaction;
 fn main() {
     db::ensure_created().unwrap();
     db::upsert_transaction(&Transaction::new(
-        None,
-        OffsetDateTime::now_local().unwrap(),
-        "Banking Plus".to_string(),
-        9.99,
-        "Entertainment".to_string(),
-        "Idk a movie or something".to_string()));
-
-    db::upsert_transaction(&Transaction::new(
-        None,
+        Some(1),
         OffsetDateTime::now_local().unwrap(),
         "Banking Plus".to_string(),
         9.99,
@@ -22,5 +14,4 @@ fn main() {
         "Idk a movie or something".to_string()));
 
     println!("{}", db::get_transaction(1).unwrap());
-    db::delete_transaction(1);
 }

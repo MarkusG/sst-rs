@@ -20,7 +20,7 @@ pub fn ensure_created() -> Result<(), sqlite::Error> {
                 amount REAL,
                 category TEXT,
                 description TEXT,
-                checksum BLOB
+                checksum BLOB UNIQUE
             );
 
             CREATE TABLE tags (
@@ -49,6 +49,15 @@ pub fn upsert_transaction(transaction: &Transaction) {
     let connection = sqlite::open(DATABASE_STRING).unwrap();
     let mut statement: Statement;
 
+    let mut hasher = Sha1::new();
+
+    hasher.input(&t.timestamp.unix_timestamp().to_le_bytes());
+    hasher.input(&t.amount.to_le_bytes());
+    hasher.input_str(&t.account);
+    hasher.input_str(&t.category);
+    hasher.input_str(&t.description);
+    let hash = hasher.result_str();
+
     // if the transaction has an ID, we assume it exists already and try to
     // update
     if let Some(id) = t.id {
@@ -58,42 +67,19 @@ pub fn upsert_transaction(transaction: &Transaction) {
                      amount = :amt,
                      account = :acc,
                      category = :cat,
-                     description = :desc
+                     description = :desc,
+                     checksum = :checksum
                      WHERE id = {}"#, id))
             .unwrap();
     }
     // else, insert it as a new transaction
     else
     {
-        // prevent duplicate record insertion
-        let mut hasher = Sha1::new();
-
-        hasher.input(&t.timestamp.unix_timestamp().to_le_bytes());
-        hasher.input(&t.amount.to_le_bytes());
-        hasher.input_str(&t.account);
-        hasher.input_str(&t.category);
-        hasher.input_str(&t.description);
-        let hash = hasher.result_str();
-
-        println!("{}", hash);
-
-        let mut check_statement = connection
-            .prepare("SELECT 1 FROM transactions WHERE checksum = :checksum")
-            .unwrap();
-
-        check_statement.bind_by_name(":checksum", &*hash).unwrap();
-
-        if let State::Row = check_statement.next().unwrap() {
-            panic!("attempted duplicate transaction insertion");
-        }
-
         statement = connection
             .prepare(r#"INSERT INTO transactions
                  (timestamp, amount, account, category, description, checksum)
                  VALUES (:ts, :amt, :acc, :cat, :desc, :checksum)"#)
             .unwrap();
-
-        statement.bind_by_name(":checksum", &*hash).unwrap();
     }
 
     // bind statement parameters
@@ -103,6 +89,7 @@ pub fn upsert_transaction(transaction: &Transaction) {
     statement.bind_by_name(":cat", &*t.category).unwrap();
     statement.bind_by_name(":desc", &*t.description).unwrap();
     statement.bind_by_name(":desc", &*t.description).unwrap();
+    statement.bind_by_name(":checksum", &*hash).unwrap();
 
     // not sure if this loop is necessary, but the sqlite crate's documentation
     // isn't very clear

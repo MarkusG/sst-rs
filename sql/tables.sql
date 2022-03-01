@@ -5,7 +5,7 @@ CREATE TABLE transactions (
 	amount REAL,
 	category TEXT,
 	description TEXT,
-	checksum BLOB
+	checksum BLOB UNIQUE
 );
 
 CREATE TABLE tags (
