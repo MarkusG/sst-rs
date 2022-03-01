@@ -4,7 +4,8 @@ CREATE TABLE transactions (
 	account TEXT,
 	amount REAL,
 	category TEXT,
-	description TEXT
+	description TEXT,
+	checksum BLOB
 );
 
 CREATE TABLE tags (

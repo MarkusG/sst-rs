@@ -1,5 +1,7 @@
 use sqlite::{State, Statement};
 use time::{UtcOffset, OffsetDateTime};
+use crypto::digest::Digest;
+use crypto::sha1::Sha1;
 
 use crate::model::Transaction;
 
@@ -17,7 +19,7 @@ pub fn ensure_created() -> Result<(), sqlite::Error> {
                 account TEXT,
                 amount REAL,
                 category TEXT,
-                description TEXT
+                description TEXT,
                 checksum BLOB
             );
 
@@ -63,11 +65,35 @@ pub fn upsert_transaction(transaction: &Transaction) {
     // else, insert it as a new transaction
     else
     {
+        // prevent duplicate record insertion
+        let mut hasher = Sha1::new();
+
+        hasher.input(&t.timestamp.unix_timestamp().to_le_bytes());
+        hasher.input(&t.amount.to_le_bytes());
+        hasher.input_str(&t.account);
+        hasher.input_str(&t.category);
+        hasher.input_str(&t.description);
+        let hash = hasher.result_str();
+
+        println!("{}", hash);
+
+        let mut check_statement = connection
+            .prepare("SELECT 1 FROM transactions WHERE checksum = :checksum")
+            .unwrap();
+
+        check_statement.bind_by_name(":checksum", &*hash).unwrap();
+
+        if let State::Row = check_statement.next().unwrap() {
+            panic!("attempted duplicate transaction insertion");
+        }
+
         statement = connection
             .prepare(r#"INSERT INTO transactions
-                 (timestamp, amount, account, category, description) VALUES
-                 (:ts, :amt, :acc, :cat, :desc)"#)
+                 (timestamp, amount, account, category, description, checksum)
+                 VALUES (:ts, :amt, :acc, :cat, :desc, :checksum)"#)
             .unwrap();
+
+        statement.bind_by_name(":checksum", &*hash).unwrap();
     }
 
     // bind statement parameters
@@ -75,6 +101,7 @@ pub fn upsert_transaction(transaction: &Transaction) {
     statement.bind_by_name(":amt", t.amount).unwrap();
     statement.bind_by_name(":acc", &*t.account).unwrap();
     statement.bind_by_name(":cat", &*t.category).unwrap();
+    statement.bind_by_name(":desc", &*t.description).unwrap();
     statement.bind_by_name(":desc", &*t.description).unwrap();
 
     // not sure if this loop is necessary, but the sqlite crate's documentation
@@ -89,7 +116,6 @@ pub fn get_transaction(id: i64) -> Option<Transaction> {
                          WHERE id = {}
                          LIMIT 1"#, id))
         .unwrap();
-
     if let State::Row = statement.next().unwrap() {
         Some(Transaction {
             id: Some(statement.read::<i64>(0).unwrap()),
