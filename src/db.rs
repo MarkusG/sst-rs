@@ -135,6 +135,50 @@ pub fn get_transaction(id: i64) -> Option<Transaction> {
     }
 }
 
+pub fn list_transactions(count: Option<i32>) -> Result<Vec<Transaction>, Box<dyn Error>> {
+    let connection = sqlite::open(DATABASE_STRING).unwrap();
+
+    // order by desc, to get most recent first
+    let mut statement = match count {
+        Some(c) => connection
+            .prepare(format!(r#"SELECT * FROM transactions
+                         ORDER BY timestamp DESC
+                         LIMIT {}"#, c))?,
+        None => connection
+            .prepare(r#"SELECT * FROM transactions
+                     ORDER BY timestamp DESC"#)?
+    };
+
+
+    let mut results: Vec<Transaction> = Vec::new();
+
+    // populate results
+    while let State::Row = statement.next()? {
+        results.push(
+            Transaction {
+                id: Some(statement.read::<i64>(0).unwrap()),
+                timestamp:
+                    // parse the timestamp as UTC
+                    OffsetDateTime::from_unix_timestamp(
+                        statement.read::<i64>(1).unwrap()).unwrap()
+                    // convert to local time
+                    .to_offset(UtcOffset::current_local_offset().unwrap()),
+                    account: statement.read::<String>(2).unwrap(),
+                    amount: statement.read::<f64>(3).unwrap(),
+                    category: match statement.read::<String>(4) {
+                        Ok(s) => Some(s),
+                        Err(_) => None
+                    },
+                    description: match statement.read::<String>(5) {
+                        Ok(s) => Some(s),
+                        Err(_) => None
+                    }
+            })
+    }
+
+    Ok(results)
+}
+
 pub fn delete_transaction(id: i32) {
     let connection = sqlite::open(DATABASE_STRING).unwrap();
     let mut statement = connection

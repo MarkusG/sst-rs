@@ -1,7 +1,6 @@
 use std::error::Error;
 
 use crate::model::Transaction;
-use crate::db::upsert_transaction;
 
 use getopts::Options;
 use time::OffsetDateTime;
@@ -47,7 +46,33 @@ pub fn add_transaction(args: &[String]) -> Result<(), Box<dyn Error>> {
     // TODO tags
 
     // insert transaction
-    upsert_transaction(&transaction)?;
+    crate::db::upsert_transaction(&transaction)?;
+
+    Ok(())
+}
+
+/// sst list [num]
+/// gets [num] last transactions, or all transactions if [num] not provided
+pub fn list_transactions(args: &[String]) -> Result<(), Box<dyn Error>> {
+    // count is an optional unnamed argument, and it comes first
+    let mut count: Option<i32> = None;
+    if let Some(arg) = args.get(1) {
+        count = Some(arg.parse::<i32>()?);
+    }
+
+    // placeholder
+    // let mut opts = Options::new();
+
+    // let matches = opts.parse(&args[2..])?;
+
+    let mut transactions = crate::db::list_transactions(count)?;
+
+    // reverse so the newest transaction is written last
+    transactions.reverse();
+
+    for t in transactions {
+        println!("{}", t);
+    }
 
     Ok(())
 }

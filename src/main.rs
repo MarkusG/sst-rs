@@ -8,6 +8,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     db::ensure_created().unwrap();
     return match args[1].as_str() {
         "add" => subcommands::add_transaction(&args[1..]),
+        "list" => subcommands::list_transactions(&args[1..]),
         _ => { println!("unknown subommand: {}", args[1]); Ok(()) }
     };
     // db::upsert_transaction(&Transaction::new(
