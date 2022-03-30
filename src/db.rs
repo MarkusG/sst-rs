@@ -140,10 +140,22 @@ pub fn list_transactions(count: Option<i32>) -> Result<Vec<Transaction>, Box<dyn
 
     // order by desc, to get most recent first
     let mut statement = match count {
-        Some(c) => connection
-            .prepare(format!(r#"SELECT * FROM transactions
-                         ORDER BY timestamp DESC
-                         LIMIT {}"#, c))?,
+        Some(c) => if c < 0 {
+            // if count negative, get the c earliest transactions
+                connection
+                    .prepare(format!(r#"SELECT * FROM transactions
+                         ORDER BY timestamp
+                         LIMIT {}"#, -c))?
+            }
+            else
+            {
+            // else, get the c latest transactions
+                connection
+                    .prepare(format!(r#"SELECT * FROM transactions
+                             ORDER BY timestamp DESC
+                             LIMIT {}"#, c))?
+            },
+            // if count not provided, get all transactions, latest first
         None => connection
             .prepare(r#"SELECT * FROM transactions
                      ORDER BY timestamp DESC"#)?
@@ -184,7 +196,7 @@ pub fn delete_transaction(id: i32) {
     let mut statement = connection
         .prepare(format!(r#"DELETE FROM transactions
                          WHERE id = {}"#, id))
-                 .unwrap();
+        .unwrap();
 
     while statement.next().unwrap() != State::Done {}
 }
