@@ -5,6 +5,7 @@ use crate::model::Transaction;
 use getopts::Options;
 use time::OffsetDateTime;
 
+/// sst add <amount> -a <account> [options]
 pub fn add_transaction(args: &[String]) -> Result<(), Box<dyn Error>> {
     // amount is an unnamed argument, and it comes first
     let amount = args[1].parse::<f64>()?;
