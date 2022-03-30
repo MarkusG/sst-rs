@@ -8,8 +8,8 @@ pub struct Transaction {
     pub timestamp: OffsetDateTime,
     pub account: String,
     pub amount: f64,
-    pub category: String,
-    pub description: String
+    pub category: Option<String>,
+    pub description: Option<String>
 }
 
 impl Transaction {
@@ -18,8 +18,8 @@ impl Transaction {
         timestamp: OffsetDateTime,
         account: String,
         amount: f64,
-        category: String,
-        description: String) -> Transaction {
+        category: Option<String>,
+        description: Option<String>) -> Transaction {
         Transaction {
             id,
             timestamp,
@@ -41,7 +41,13 @@ impl fmt::Display for Transaction {
                self.timestamp,
                self.account,
                self.amount,
-               self.category,
-               self.description)
+               match &self.category {
+                   Some(category) => &category,
+                   None => ""
+               },
+               match &self.description {
+                   Some(description) => &description,
+                   None => ""
+               })
     }
 }

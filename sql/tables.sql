@@ -1,11 +1,11 @@
 CREATE TABLE transactions (
 	id INTEGER PRIMARY KEY,
-	timestamp INTEGER,
-	account TEXT,
-	amount REAL,
+	timestamp INTEGER NOT NULL,
+	account TEXT NOT NULL,
+	amount REAL NOT NULL,
 	category TEXT,
 	description TEXT,
-	checksum BLOB UNIQUE
+	checksum BLOB NOT NULL UNIQUE
 );
 
 CREATE TABLE tags (

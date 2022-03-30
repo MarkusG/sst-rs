@@ -1,3 +1,5 @@
+use std::error::Error;
+
 use sqlite::{State, Statement};
 use time::{UtcOffset, OffsetDateTime};
 use crypto::digest::Digest;
@@ -15,12 +17,12 @@ pub fn ensure_created() -> Result<(), sqlite::Error> {
         connection.execute(r#"
             CREATE TABLE transactions (
                 id INTEGER PRIMARY KEY,
-                timestamp INTEGER,
-                account TEXT,
-                amount REAL,
+                timestamp INTEGER NOT NULL,
+                account TEXT NOT NULL,
+                amount REAL NOT NULL,
                 category TEXT,
                 description TEXT,
-                checksum BLOB UNIQUE
+                checksum BLOB NOT NULL UNIQUE
             );
 
             CREATE TABLE tags (
@@ -43,10 +45,10 @@ pub fn ensure_created() -> Result<(), sqlite::Error> {
     Ok(())
 }
 
-pub fn upsert_transaction(transaction: &Transaction) {
+pub fn upsert_transaction(transaction: &Transaction) -> Result<(), Box<dyn Error>> {
     let t = transaction;
 
-    let connection = sqlite::open(DATABASE_STRING).unwrap();
+    let connection = sqlite::open(DATABASE_STRING)?;
     let mut statement: Statement;
 
     let mut hasher = Sha1::new();
@@ -54,9 +56,6 @@ pub fn upsert_transaction(transaction: &Transaction) {
     hasher.input(&t.timestamp.unix_timestamp().to_le_bytes());
     hasher.input(&t.amount.to_le_bytes());
     hasher.input_str(&t.account);
-    hasher.input_str(&t.category);
-    hasher.input_str(&t.description);
-    let hash = hasher.result_str();
 
     // if the transaction has an ID, we assume it exists already and try to
     // update
@@ -69,8 +68,7 @@ pub fn upsert_transaction(transaction: &Transaction) {
                      category = :cat,
                      description = :desc,
                      checksum = :checksum
-                     WHERE id = {}"#, id))
-            .unwrap();
+                     WHERE id = {}"#, id))?;
     }
     // else, insert it as a new transaction
     else
@@ -78,22 +76,29 @@ pub fn upsert_transaction(transaction: &Transaction) {
         statement = connection
             .prepare(r#"INSERT INTO transactions
                  (timestamp, amount, account, category, description, checksum)
-                 VALUES (:ts, :amt, :acc, :cat, :desc, :checksum)"#)
-            .unwrap();
+                 VALUES (:ts, :amt, :acc, :cat, :desc, :checksum)"#)?;
     }
 
     // bind statement parameters
-    statement.bind_by_name(":ts", t.timestamp.unix_timestamp()).unwrap();
-    statement.bind_by_name(":amt", t.amount).unwrap();
-    statement.bind_by_name(":acc", &*t.account).unwrap();
-    statement.bind_by_name(":cat", &*t.category).unwrap();
-    statement.bind_by_name(":desc", &*t.description).unwrap();
-    statement.bind_by_name(":desc", &*t.description).unwrap();
-    statement.bind_by_name(":checksum", &*hash).unwrap();
+    statement.bind_by_name(":ts", t.timestamp.unix_timestamp())?;
+    statement.bind_by_name(":amt", t.amount)?;
+    statement.bind_by_name(":acc", &*t.account)?;
+    if let Some(c) = &t.category {
+        statement.bind_by_name(":cat", &**c)?;
+        hasher.input_str(c);
+    }
+    if let Some(d) = &t.description {
+        statement.bind_by_name(":desc", &**d)?;
+        hasher.input_str(d);
+    }
+    let hash = hasher.result_str();
+    statement.bind_by_name(":checksum", &*hash)?;
 
     // not sure if this loop is necessary, but the sqlite crate's documentation
     // isn't very clear
-    while statement.next().unwrap() != State::Done {}
+    while statement.next()? != State::Done {}
+
+    Ok(())
 }
 
 pub fn get_transaction(id: i64) -> Option<Transaction> {
@@ -114,8 +119,14 @@ pub fn get_transaction(id: i64) -> Option<Transaction> {
                 .to_offset(UtcOffset::current_local_offset().unwrap()),
             account: statement.read::<String>(2).unwrap(),
             amount: statement.read::<f64>(3).unwrap(),
-            category: statement.read::<String>(4).unwrap(),
-            description: statement.read::<String>(5).unwrap()
+            category: match statement.read::<String>(4) {
+                Ok(s) => Some(s),
+                Err(_) => None
+            },
+            description: match statement.read::<String>(5) {
+                Ok(s) => Some(s),
+                Err(_) => None
+            }
         })
     }
     else
