@@ -2,8 +2,6 @@ use std::error::Error;
 
 use sqlite::{State, Statement};
 use time::{UtcOffset, OffsetDateTime};
-use crypto::digest::Digest;
-use crypto::sha1::Sha1;
 
 use crate::model::Transaction;
 
@@ -21,8 +19,7 @@ pub fn ensure_created() -> Result<(), sqlite::Error> {
                 account TEXT NOT NULL,
                 amount REAL NOT NULL,
                 category TEXT,
-                description TEXT,
-                checksum BLOB NOT NULL UNIQUE
+                description TEXT
             );
 
             CREATE TABLE tags (
@@ -51,12 +48,6 @@ pub fn upsert_transaction(transaction: &Transaction) -> Result<(), Box<dyn Error
     let connection = sqlite::open(DATABASE_STRING)?;
     let mut statement: Statement;
 
-    let mut hasher = Sha1::new();
-
-    hasher.input(&t.timestamp.unix_timestamp().to_le_bytes());
-    hasher.input(&t.amount.to_le_bytes());
-    hasher.input_str(&t.account);
-
     // if the transaction has an ID, we assume it exists already and try to
     // update
     if let Some(id) = t.id {
@@ -66,8 +57,7 @@ pub fn upsert_transaction(transaction: &Transaction) -> Result<(), Box<dyn Error
                      amount = :amt,
                      account = :acc,
                      category = :cat,
-                     description = :desc,
-                     checksum = :checksum
+                     description = :desc
                      WHERE id = {}"#, id))?;
     }
     // else, insert it as a new transaction
@@ -75,8 +65,8 @@ pub fn upsert_transaction(transaction: &Transaction) -> Result<(), Box<dyn Error
     {
         statement = connection
             .prepare(r#"INSERT INTO transactions
-                 (timestamp, amount, account, category, description, checksum)
-                 VALUES (:ts, :amt, :acc, :cat, :desc, :checksum)"#)?;
+                 (timestamp, amount, account, category, description)
+                 VALUES (:ts, :amt, :acc, :cat, :desc)"#)?;
     }
 
     // bind statement parameters
@@ -85,14 +75,10 @@ pub fn upsert_transaction(transaction: &Transaction) -> Result<(), Box<dyn Error
     statement.bind_by_name(":acc", &*t.account)?;
     if let Some(c) = &t.category {
         statement.bind_by_name(":cat", &**c)?;
-        hasher.input_str(c);
     }
     if let Some(d) = &t.description {
         statement.bind_by_name(":desc", &**d)?;
-        hasher.input_str(d);
     }
-    let hash = hasher.result_str();
-    statement.bind_by_name(":checksum", &*hash)?;
 
     // not sure if this loop is necessary, but the sqlite crate's documentation
     // isn't very clear

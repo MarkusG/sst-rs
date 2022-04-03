@@ -8,5 +8,4 @@ edition = "2018"
 [dependencies]
 time = { version = "0.3.7", features = [ "local-offset" ] }
 sqlite = "0.26.0"
-rust-crypto = "0.2.36"
 getopts = "0.2"
