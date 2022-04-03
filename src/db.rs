@@ -177,12 +177,12 @@ pub fn list_transactions(count: Option<i32>) -> Result<Vec<Transaction>, Box<dyn
     Ok(results)
 }
 
-pub fn delete_transaction(id: i32) {
+pub fn delete_transaction(id: i32) -> Result<(), Box<dyn Error>> {
     let connection = sqlite::open(DATABASE_STRING).unwrap();
     let mut statement = connection
         .prepare(format!(r#"DELETE FROM transactions
-                         WHERE id = {}"#, id))
-        .unwrap();
+                         WHERE id = {}"#, id))?;
 
-    while statement.next().unwrap() != State::Done {}
+    while statement.next()? != State::Done {}
+    Ok(())
 }

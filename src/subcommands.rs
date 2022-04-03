@@ -77,3 +77,12 @@ pub fn list_transactions(args: &[String]) -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
+
+/// sst delete <id>
+/// deletes the indicated transaction
+pub fn delete_transaction(args: &[String]) -> Result<(), Box<dyn Error>> {
+    let id = args.get(1).unwrap().parse::<i32>()?;
+    crate::db::delete_transaction(id)?;
+
+    Ok(())
+}
