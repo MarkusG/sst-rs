@@ -87,22 +87,21 @@ pub fn upsert_transaction(transaction: &Transaction) -> Result<(), Box<dyn Error
     Ok(())
 }
 
-pub fn get_transaction(id: i64) -> Option<Transaction> {
-    let connection = sqlite::open(DATABASE_STRING).unwrap();
+pub fn get_transaction(id: i64) -> Result<Option<Transaction>, Box<dyn Error>> {
+    let connection = sqlite::open(DATABASE_STRING)?;
     let mut statement = connection
         .prepare(format!(r#"SELECT * FROM transactions
                          WHERE id = {}
-                         LIMIT 1"#, id))
-        .unwrap();
-    if let State::Row = statement.next().unwrap() {
-        Some(Transaction {
-            id: Some(statement.read::<i64>(0).unwrap()),
+                         LIMIT 1"#, id))?;
+    if let State::Row = statement.next()? {
+        Ok(Some(Transaction {
+            id: Some(statement.read::<i64>(0)?),
             timestamp:
                 // parse the timestamp as UTC
                 OffsetDateTime::from_unix_timestamp(
-                statement.read::<i64>(1).unwrap()).unwrap(),
-            account: statement.read::<String>(2).unwrap(),
-            amount: statement.read::<f64>(3).unwrap(),
+                statement.read::<i64>(1)?)?,
+            account: statement.read::<String>(2)?,
+            amount: statement.read::<f64>(3)?,
             category: match statement.read::<String>(4) {
                 Ok(s) => Some(s),
                 Err(_) => None
@@ -111,16 +110,16 @@ pub fn get_transaction(id: i64) -> Option<Transaction> {
                 Ok(s) => Some(s),
                 Err(_) => None
             }
-        })
+        }))
     }
     else
     {
-        None
+        Ok(None)
     }
 }
 
 pub fn list_transactions(count: Option<i32>) -> Result<Vec<Transaction>, Box<dyn Error>> {
-    let connection = sqlite::open(DATABASE_STRING).unwrap();
+    let connection = sqlite::open(DATABASE_STRING)?;
 
     // order by desc, to get most recent first
     let mut statement = match count {
@@ -152,13 +151,13 @@ pub fn list_transactions(count: Option<i32>) -> Result<Vec<Transaction>, Box<dyn
     while let State::Row = statement.next()? {
         results.push(
             Transaction {
-                id: Some(statement.read::<i64>(0).unwrap()),
+                id: Some(statement.read::<i64>(0)?),
                 timestamp:
                     // parse the timestamp as UTC
                     OffsetDateTime::from_unix_timestamp(
-                        statement.read::<i64>(1).unwrap()).unwrap(),
-                    account: statement.read::<String>(2).unwrap(),
-                    amount: statement.read::<f64>(3).unwrap(),
+                        statement.read::<i64>(1)?)?,
+                    account: statement.read::<String>(2)?,
+                    amount: statement.read::<f64>(3)?,
                     category: match statement.read::<String>(4) {
                         Ok(s) => Some(s),
                         Err(_) => None
@@ -174,7 +173,7 @@ pub fn list_transactions(count: Option<i32>) -> Result<Vec<Transaction>, Box<dyn
 }
 
 pub fn delete_transaction(id: i32) -> Result<(), Box<dyn Error>> {
-    let connection = sqlite::open(DATABASE_STRING).unwrap();
+    let connection = sqlite::open(DATABASE_STRING)?;
     let mut statement = connection
         .prepare(format!(r#"DELETE FROM transactions
                          WHERE id = {}"#, id))?;
