@@ -10,6 +10,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         "add" => subcommands::add_transaction(&args[1..]),
         "list" => subcommands::list_transactions(&args[1..]),
         "delete" => subcommands::delete_transaction(&args[1..]),
+        "import" => subcommands::import_transactions(&args[1..]),
         _ => { println!("unknown subommand: {}", args[1]); Ok(()) }
     };
     // db::upsert_transaction(&Transaction::new(

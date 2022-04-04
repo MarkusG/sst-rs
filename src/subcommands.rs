@@ -1,6 +1,8 @@
 use std::error::Error;
+use std::fs;
 
 use crate::model::Transaction;
+use crate::parser::parse;
 
 use getopts::Options;
 use time::OffsetDateTime;
@@ -83,6 +85,35 @@ pub fn list_transactions(args: &[String]) -> Result<(), Box<dyn Error>> {
 pub fn delete_transaction(args: &[String]) -> Result<(), Box<dyn Error>> {
     let id = args.get(1).unwrap().parse::<i32>()?;
     crate::db::delete_transaction(id)?;
+
+    Ok(())
+}
+
+/// sst import <filename> <schema> -a <account>
+/// imports the transactions from <filename>
+pub fn import_transactions(args: &[String]) -> Result<(), Box<dyn Error>> {
+    let filename = args.get(1).unwrap();
+    let schema = args.get(2).unwrap();
+
+    // parse named arguments
+    let mut opts = Options::new();
+    opts.optopt("a", "account", "transaction account", "ACCOUNT");
+
+    let matches = opts.parse(&args[2..])?;
+
+    // require account
+    let account = match matches.opt_str("a") {
+        Some(a) => a,
+        // TODO return an error here once we have errors sorted out better
+        None => panic!()
+    };
+
+    let contents = fs::read_to_string(filename)?;
+    let transactions = parse(&contents, &schema, &account)?;
+
+    for t in transactions {
+        crate::db::upsert_transaction(&t)?;
+    }
 
     Ok(())
 }
