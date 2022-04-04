@@ -2,7 +2,8 @@ use std::error::Error;
 
 use crate::model::Transaction;
 
-use time::OffsetDateTime;
+use time::{OffsetDateTime, Date, Time};
+use time::format_description;
 
 pub fn parse(contents: &str, schema: &str, account: &str) -> Result<Vec<Transaction>, Box<dyn Error>> {
     match schema {
@@ -13,6 +14,7 @@ pub fn parse(contents: &str, schema: &str, account: &str) -> Result<Vec<Transact
 
 pub fn parse_citi(contents: &str, account: &str) -> Result<Vec<Transaction>, Box<dyn Error>> {
     let mut reader = csv::Reader::from_reader(contents.as_bytes());
+    let format = format_description::parse("[month]/[day]/[year]")?;
 
     let mut result: Vec<Transaction> = Vec::new();
     for r in reader.records().skip(1) {
@@ -26,7 +28,11 @@ pub fn parse_citi(contents: &str, account: &str) -> Result<Vec<Transaction>, Box
             amount: debit + credit,
             category: None,
             description: Some(record.get(2).unwrap().to_string()),
-            timestamp: OffsetDateTime::now_local()?
+            timestamp: OffsetDateTime::now_utc()
+                .replace_date(Date::parse(
+                        record.get(1).unwrap(), &format
+                        )?)
+                .replace_time(Time::MIDNIGHT)
         });
     }
 

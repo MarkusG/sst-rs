@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use sqlite::{State, Statement};
-use time::{UtcOffset, OffsetDateTime};
+use time::OffsetDateTime;
 
 use crate::model::Transaction;
 
@@ -100,9 +100,7 @@ pub fn get_transaction(id: i64) -> Option<Transaction> {
             timestamp:
                 // parse the timestamp as UTC
                 OffsetDateTime::from_unix_timestamp(
-                statement.read::<i64>(1).unwrap()).unwrap()
-                // convert to local time
-                .to_offset(UtcOffset::current_local_offset().unwrap()),
+                statement.read::<i64>(1).unwrap()).unwrap(),
             account: statement.read::<String>(2).unwrap(),
             amount: statement.read::<f64>(3).unwrap(),
             category: match statement.read::<String>(4) {
@@ -158,9 +156,7 @@ pub fn list_transactions(count: Option<i32>) -> Result<Vec<Transaction>, Box<dyn
                 timestamp:
                     // parse the timestamp as UTC
                     OffsetDateTime::from_unix_timestamp(
-                        statement.read::<i64>(1).unwrap()).unwrap()
-                    // convert to local time
-                    .to_offset(UtcOffset::current_local_offset().unwrap()),
+                        statement.read::<i64>(1).unwrap()).unwrap(),
                     account: statement.read::<String>(2).unwrap(),
                     amount: statement.read::<f64>(3).unwrap(),
                     category: match statement.read::<String>(4) {
