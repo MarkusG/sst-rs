@@ -2,7 +2,12 @@ use hyper_tls::HttpsConnector;
 use hyper::{Client, Body, Method, Request};
 use serde_json::json;
 use serde::Deserialize;
-use crate::plaid::entities::Transaction;
+
+use crate::HttpError;
+use crate::plaid::{
+    entities::Transaction,
+    auth::Credentials
+};
 
 #[derive(Debug, Deserialize)]
 pub struct SyncResponse {
@@ -13,13 +18,13 @@ pub struct SyncResponse {
     next_cursor: String
 }
 
-pub async fn sync_transactions(client_id: &str, client_secret: &str, token: &str)
+pub async fn sync_transactions(credentials: Credentials)
     -> Result<SyncResponse, Box<dyn std::error::Error>> {
     let body = json!(
         {
-            "client_id": client_id,
-            "secret": client_secret,
-            "access_token": token
+            "client_id": credentials.client_id,
+            "secret": credentials.client_secret,
+            "access_token": credentials.token
         });
 
     let req = Request::builder()
@@ -32,10 +37,12 @@ pub async fn sync_transactions(client_id: &str, client_secret: &str, token: &str
     let client = Client::builder().build::<_, hyper::Body>(https);
 
     let resp = client.request(req).await?;
+    if resp.status().is_client_error() || resp.status().is_server_error() {
+        return Err(Box::new(HttpError { status_code: resp.status() }))
+    }
     let bytes = hyper::body::to_bytes(resp.into_body()).await?;
     let resp_string = String::from_utf8(bytes.to_vec())?;
     let resp: SyncResponse = serde_json::from_str(&resp_string)?;
-    println!("{:?}", resp);
 
     Ok(resp)
 }
