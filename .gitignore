@@ -1,3 +1,4 @@
 /target
 sst.db
 *.csv
+credentials.txt
